@@ -1,13 +1,12 @@
-
 import flet
-from flet import Page, UserControl, TextField, Column, AppBar, Text, colors, IconButton, icons, Row, View, ProgressBar, TextButton, ListView
+from flet import Page, UserControl, TextField, Column, AppBar, Text, colors, IconButton, icons, Row, View, ProgressBar, TextButton, Stack, ListView
 import requests
 
-class FindsAddressAppByCEP(UserControl):
+class FindsAddressByCEP(UserControl):
 
     def build(self):
         self.cep = TextField(label='CEP')
-        self.results = Column()
+        self.results = TextField(label='Resultado', disabled=False, multiline=True, expand=True, text_size=12) 
 
         # app's root
         root = Column(
@@ -17,7 +16,7 @@ class FindsAddressAppByCEP(UserControl):
                             self.cep,
                             IconButton(icon=icons.SEARCH, icon_color=colors.BLUE, on_click=self.find_by_cep),
                             ]),
-                        self.results,
+                        Row([self.results]),
             ],
         )
 
@@ -27,13 +26,12 @@ class FindsAddressAppByCEP(UserControl):
         try:
             request = requests.get(f'http://viacep.com.br/ws/{self.cep.value}/json')
             address = request.json()
-            self.results.controls.append(Text(
-                f"Endereço: {address['logradouro'].upper()}, {address['bairro'].upper()}, {address['localidade'].upper()}/{address['uf'].upper()}.")
-            )
-        except:
-            self.results.controls.append(Text('CEP inválido'))
 
-        self.cep.value = ''
+            self.results.value = f"Endereço: {address['logradouro'].upper()}, {address['bairro'].upper()}, {address['localidade'].upper()}/{address['uf'].upper()}."
+
+        except:
+            self.results.value = 'CEP inválido' 
+
         self.update()
 
 class FindsCEPByAddress(UserControl):
@@ -42,7 +40,7 @@ class FindsCEPByAddress(UserControl):
         self.uf = TextField(label='UF')
         self.city = TextField(label='Cidade')
         self.street = TextField(label='Rua')
-        self.results = ListView(expand=True, auto_scroll=True)
+        self.results = TextField(label='Resultado', disabled=False, multiline=True, expand=True, text_size=12)
 
         # app's root
         root = Column(
@@ -53,35 +51,32 @@ class FindsCEPByAddress(UserControl):
                             self.city,
                             Row(controls=[
                                 self.street,
-                                IconButton(icon=icons.SEARCH, icon_color=colors.BLUE, on_click=self.find_by_address)
+                                IconButton(icon=icons.SEARCH, icon_color=colors.BLUE, on_click=self.find_cep_by_address)
                                 ]),
                         ],
                     ),
-                    self.results,
+                    Row([self.results]),
             ],
         )
 
         return root
 
-    def find_by_address(self, e):
+    def find_cep_by_address(self, e):
         try:
             request = requests.get(f"http://viacep.com.br/ws/{self.uf.value}/{self.city.value}/{self.street.value}/json")
             addresses = request.json()
             
             # algumas vezes a busca retorna uma lista vazia, entao é melhor checar isso:
             if addresses != []:
+                results = ''
                 for item in addresses:
-                    self.results.controls.append(Text(
-                        f"Endereço: {item['logradouro'].upper()}, "
-                        f"{item['complemento'].upper()} "
-                            f"{item['bairro'].upper()}, "
-                            f"{item['localidade'].upper()}/{item['uf'].upper()}, "
-                            f"CEP {item['cep'].upper()} \n")
-                    )
-                else:
-                    self.results.controls.append(Text('Endereço não encontrado'))
+                    index = addresses.index(item)+1
+                    results += f"Endereço {index}: {item['logradouro'].upper()}, {item['complemento'].upper()} {item['bairro'].upper()}, {item['localidade'].upper()}/{item['uf'].upper()}, CEP {item['cep'].upper()} \n"
+                self.results.value = results[:-1] # slice para retirar a última quebra de linha
+            else:
+                self.results.value = 'Endereço não encontrado'
         except:
-            self.results.controls.append(Text('Endereço não encontrado'))
+            self.results.value = 'Erro interno'
 
         self.uf.value = ''
         self.city.value = ''
@@ -93,6 +88,8 @@ def main(page: Page):
     page.window_height = 500
     page.window_width = 379
     page.window_maximized = False
+    finds_address_by_cep = FindsAddressByCEP()
+    finds_cep_by_address = FindsCEPByAddress()
 
     def route_change(route):
         page.views.clear()
@@ -103,7 +100,7 @@ def main(page: Page):
                     AppBar(title=Text('Busca ENDEREÇO pelo CEP', size=12), bgcolor=colors.SURFACE_VARIANT, actions=[
                         TextButton(text='Bucar CEP pelo ENDEREÇO',  scale=.8, on_click=lambda _: page.go('/busca-cep-pelo-endereco'))
                     ]),
-                    FindsAddressAppByCEP(),
+                    finds_address_by_cep,
 
                 ],
             ),
@@ -116,7 +113,7 @@ def main(page: Page):
                         AppBar(title=Text('Busca CEP pelo ENDEREÇO', size=12), bgcolor=colors.SURFACE_VARIANT, actions=[
                             TextButton(text='Bucar ENDEREÇO pelo CEP', scale=.8, on_click=lambda _: page.go('/'))
                             ]),
-                        FindsCEPByAddress(),
+                        finds_cep_by_address,
                     ],
                 ),
             )
