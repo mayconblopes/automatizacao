@@ -1,15 +1,14 @@
-from email.policy import default
-from inspect import Attribute
-from turtle import bgcolor
 from typing import Dict
 import flet
-from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox, Card, Container, margin
+from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox, Card, Container, margin, AlertDialog
 from docxtpl import DocxTemplate
 
 
 class DocForm(UserControl):
 
-    page: Page
+    def __init__(self, page):
+        super().__init__()
+        self.page = page
 
     def build(self):
 
@@ -62,6 +61,8 @@ class DocForm(UserControl):
         # END -- campos específicos para o Contrato de honorários --
         
         self.context: Dict = {}
+        self.page.dialog = AlertDialog(title=Text("Hello, you!"), on_dismiss=lambda e: print("Dialog dismissed!"))
+
         self.root = Row(
                         vertical_alignment='start', 
                         controls=[
@@ -114,9 +115,11 @@ class DocForm(UserControl):
                                 margin = margin.only(left=50),
                             ),
                         ])
+        
+        print(self.root.controls)
 
-        # change text size of all controls to 11
-        for control in self.root.controls:
+        # change text size of all TextFields to 11
+        for control in self.root.controls[0].controls:
             try:
                 for field in control.controls:
                     field.text_size = 11
@@ -130,7 +133,7 @@ class DocForm(UserControl):
         # self.nacionalidade.value = ''
         # (...)
         # empty all fields with FOR
-        for control in self.root.controls:
+        for control in self.root.controls[0].controls:
             for field in control.controls:
                 try:
                     # o if é para ignorar os checkboxes
@@ -170,15 +173,18 @@ class DocForm(UserControl):
         doc.render(self.context)
         primeiro_nome = self.nome_cliente.value.split(' ')[0]
         doc.save(f'{tipo}_{primeiro_nome}.docx')
+        self.page.dialog.title = Text(f'Documento {tipo} gerado com sucesso')
+        self.page.dialog.open = True
+        self.page.update()
     
     def gerar_procuracao(self, e):
         self.gerar_doc(tipo='Procuracao', template=self.TEMPLATE_PROCURACAO)
     
     def gerar_declaracao_hipossuficiencia(self, e):
-        self.gerar_doc(tipo='Declaracao_Hipossuficiencia', template=self.TEMPLATE_DECLARACAO_HIPOSSUFICIENCIA)
+        self.gerar_doc(tipo='Declaracao de Hipossuficiencia', template=self.TEMPLATE_DECLARACAO_HIPOSSUFICIENCIA)
 
     def gerar_contrato_honorarios(self, e):
-        self.gerar_doc(tipo='Contrato_Honorarios', template=self.TEMPLATE_CONTRATO_HONORARIOS)
+        self.gerar_doc(tipo='Contrato de Honorarios', template=self.TEMPLATE_CONTRATO_HONORARIOS)
 
     def custom_hono(self, e):
         if self.honorarios.value == 'Outro':
@@ -200,15 +206,14 @@ def main(page: Page):
     page.window_width = 1200
     page.window_height = 650
     page.window_maximized = False
-
-
+    
     def route_change(route):
         page.views.clear()
         page.views.append(
             
             View('/', [
                 AppBar(title=Text('AutoDocs'), bgcolor=colors.BLUE_GREY_900),
-                DocForm()
+                DocForm(page)
             ], bgcolor='0xFF424242'),
         )
 
