@@ -1,11 +1,16 @@
 from email.policy import default
+from inspect import Attribute
+from turtle import bgcolor
 from typing import Dict
 import flet
-from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox
+from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox, Card, Container, margin
 from docxtpl import DocxTemplate
 
 
 class DocForm(UserControl):
+
+    page: Page
+
     def build(self):
 
         # START - constantes
@@ -45,51 +50,78 @@ class DocForm(UserControl):
         self.administrador_contrato: TextField = TextField(label='ADMINISTRADOR', hint_text='Administrador do contrato', width=300)
         self.checkbox_honorarios_iniciais: Checkbox = Checkbox(value=False, on_change=self.toggle_honorarios_iniciais)
         self.honorarios_iniciais: TextField = TextField(label='Honorários iniciais', disabled=True)
-        self.honorarios: Dropdown = Dropdown(label='HONORÁRIOS', width=200, on_change=self.custom_hono, value=list(self.OPCOES_HONORARIOS.keys())[0])
+        self.honorarios: Dropdown = Dropdown(
+                                                label='HONORÁRIOS',
+                                                width=200,
+                                                on_change=self.custom_hono,
+                                                value=list(self.OPCOES_HONORARIOS.keys())[0]
+                                            )
         self.custom_honorarios: TextField = TextField(label='Descrição dos honorários', visible=False, width=630, multiline=True)
         for opcao in self.OPCOES_HONORARIOS.keys():
             self.honorarios.options.append(dropdown.Option(opcao))
         # END -- campos específicos para o Contrato de honorários --
         
         self.context: Dict = {}
-        self.root =  Column([
+        self.root = Row(
+                        vertical_alignment='start', 
+                        controls=[
+                            Column([
 
-                    Row([
-                        self.nome_cliente, self.nacionalidade, self.estado_civil, 
-                    ], wrap=True),
+                                Row([
+                                    self.nome_cliente, self.nacionalidade, self.estado_civil, 
+                                ], wrap=True),
 
-                    Row([
-                        self.profissao, self.data_nascimento, self.rg, self.cpf,
-                    ], wrap=True),
+                                Row([
+                                    self.profissao, self.data_nascimento, self.rg, self.cpf,
+                                ], wrap=True),
 
-                    Row([
-                        self.logradouro, self.numero, self.bairro,
-                    ], wrap=True),
+                                Row([
+                                    self.logradouro, self.numero, self.bairro,
+                                ], wrap=True),
 
-                    Row([
-                        self.cidade, self.uf, self.cep, self.email,
-                    ], wrap=True),
+                                Row([
+                                    self.cidade, self.uf, self.cep, self.email,
+                                ], wrap=True),
 
-                    Row([self.finalidade], wrap=True),
+                                Row([self.finalidade], wrap=True),
 
-                    Row([self.checkbox_honorarios_iniciais, self.honorarios_iniciais]),
-                    
-                    Row([
-                        self.administrador_contrato, self.honorarios, 
-                    ], wrap=True),
+                                Row([self.checkbox_honorarios_iniciais, self.honorarios_iniciais]),
+                                
+                                Row([
+                                    self.administrador_contrato, self.honorarios, 
+                                ], wrap=True),
 
-                    Row([
-                        self.custom_honorarios,
-                    ], wrap=True),
+                                Row([
+                                    self.custom_honorarios,
+                                ], wrap=True),
+                            ]),
 
-                    Row([
-                        ElevatedButton('Limpar campos', on_click=self.limpar_campos, bgcolor=colors.RED_ACCENT_100, color='black'),
-                        ElevatedButton('Nova Procuração', on_click=self.gerar_procuracao),
-                        ElevatedButton('Nova Declaração de Hip.', on_click=self.gerar_declaracao_hipossuficiencia),
-                        ElevatedButton('Novo Contrato de Honorários.', on_click=self.gerar_contrato_honorarios),
-                    ]),
-                    
-                ])
+                            Card(
+                                content=Container(
+                                    Column([
+                                                ElevatedButton('Nova Procuração', on_click=self.gerar_procuracao),
+                                                ElevatedButton('Nova Dec Hipossuficiência', on_click=self.gerar_declaracao_hipossuficiencia),
+                                                ElevatedButton('Novo Contrato de Honorários', on_click=self.gerar_contrato_honorarios),
+                                                ElevatedButton('Limpar campos', on_click=self.limpar_campos,
+                                                                                bgcolor=colors.RED_ACCENT_100, color='black'),
+                                            ],
+                                            horizontal_alignment='center', spacing=30
+                                    ),
+                                    padding=30,
+                                    bgcolor=colors.BLUE_GREY_900,
+                                    border_radius=10,
+                                ),
+                                margin = margin.only(left=50),
+                            ),
+                        ])
+
+        # change text size of all controls to 11
+        for control in self.root.controls:
+            try:
+                for field in control.controls:
+                    field.text_size = 11
+            except AttributeError:
+                pass
         
         return self.root
     
@@ -114,7 +146,6 @@ class DocForm(UserControl):
         doc = DocxTemplate(template)
 
         self.context = { 
-            
             'nome_cliente': self.nome_cliente.value,
             'nacionalidade': self.nacionalidade.value,
             'estado_civil': self.estado_civil.value, 
@@ -163,22 +194,22 @@ class DocForm(UserControl):
         self.update() 
 
 
-
 def main(page: Page):
-    
+    page.theme_mode = 'dark'
+    page.title = 'AutoDocs'
+    page.window_width = 1200
+    page.window_height = 650
+    page.window_maximized = False
+
 
     def route_change(route):
         page.views.clear()
-        page.theme_mode = 'dark'
-        page.window_width = 800
-        page.window_height = 650
-        page.window_maximized = False
         page.views.append(
             
             View('/', [
                 AppBar(title=Text('AutoDocs'), bgcolor=colors.BLUE_GREY_900),
                 DocForm()
-            ]),
+            ], bgcolor='0xFF424242'),
         )
 
         page.update()
@@ -196,4 +227,3 @@ def main(page: Page):
     
 
 flet.app(target=main, port=8000, route_url_strategy='path')
-
