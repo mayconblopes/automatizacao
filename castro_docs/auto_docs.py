@@ -1,7 +1,9 @@
+from ast import Str
 from typing import Dict
 import flet
 from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors
 from docxtpl import DocxTemplate
+
 
 class ClienteForm(UserControl):
     def build(self):
@@ -21,6 +23,9 @@ class ClienteForm(UserControl):
         self.email: TextField = TextField(label='E-MAIL', width=150)
         self.finalidade: TextField = TextField(label='FINALIDADE', width=630, multiline=True)
         self.context: Dict 
+        self.template_procuracao: Str = 'templates/procuracao.docx'
+        self.template_declaracao_hipossuficiencia: Str = 'templates/declaracao_hipossuficiencia.docx'
+        self.template_contrato_honorarios: Str ='templates/contrato_honorarios.docx'
 
         root =  Column([
 
@@ -44,14 +49,35 @@ class ClienteForm(UserControl):
 
                     Row([
                         ElevatedButton('Limpar campos', on_click=self.limpar_campos, bgcolor=colors.RED_ACCENT_100, color='black'),
-                        ElevatedButton('Gerar procuração', on_click=self.gerar_procuracao),
+                        ElevatedButton('Nova Procuração', on_click=self.gerar_procuracao),
+                        ElevatedButton('Nova Declaração de Hip.', on_click=self.gerar_declaracao_hipossuficiencia),
                     ])
                 ])
         
         return root
+    
+    def limpar_campos(self, e):
+            self.nome_cliente.value = ''
+            self.nacionalidade.value = ''
+            self.estado_civil.value = ''
+            self.profissao.value = ''
+            self.data_nascimento.value = ''
+            self.rg.value = ''
+            self.cpf.value = ''
+            self.logradouro.value = ''
+            self.numero.value = ''
+            self.bairro.value = ''
+            self.cidade.value = ''
+            self.uf.value = ''
+            self.cep.value = ''
+            self.email.value = ''
+            self.finalidade.value = ''
+            self.update()
 
-    def gerar_procuracao(self, e):
-        doc = DocxTemplate('templates/procuracao.docx')
+    def gerar_doc(self, tipo, template):
+      # doc = DocxTemplate('templates/procuracao.docx')
+        doc = DocxTemplate(template)
+
         self.context = { 
             
             'nome_cliente': self.nome_cliente.value,
@@ -73,25 +99,18 @@ class ClienteForm(UserControl):
 
         doc.render(self.context)
         primeiro_nome = self.nome_cliente.value.split(' ')[0]
-        doc.save(f'Procuracao_{primeiro_nome}.docx')
+        doc.save(f'{tipo}_{primeiro_nome}.docx')
+    
+    def gerar_procuracao(self, e):
+        self.gerar_doc(tipo='Procuracao', template='templates/procuracao.docx')
+    
+    def gerar_declaracao_hipossuficiencia(self, e):
+        self.gerar_doc(tipo='Declaracao_Hipossuficiencia', template='templates/declaracao _hipossuficiencia.docx')
 
-    def limpar_campos(self, e):
-        self.nome_cliente.value = ''
-        self.nacionalidade.value = ''
-        self.estado_civil.value = ''
-        self.profissao.value = ''
-        self.data_nascimento.value = ''
-        self.rg.value = ''
-        self.cpf.value = ''
-        self.logradouro.value = ''
-        self.numero.value = ''
-        self.bairro.value = ''
-        self.cidade.value = ''
-        self.uf.value = ''
-        self.cep.value = ''
-        self.email.value = ''
-        self.finalidade.value = ''
-        self.update()
+
+
+
+    
 
 def main(page: Page):
     
