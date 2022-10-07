@@ -1,6 +1,7 @@
+from email.policy import default
 from typing import Dict
 import flet
-from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown
+from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox
 from docxtpl import DocxTemplate
 
 
@@ -41,14 +42,16 @@ class DocForm(UserControl):
         # END -- campos comuns à Procuracao, Declaracao de Hip. e Contrato de Honorários --
 
         # START -- campos específicos para o Contrato de honorários --
-        self.administrador_contrato: TextField = TextField(label='ADMINISTRADOR', hint_text='Nome do advogado administrador do contrato de honorários', width=300)
-        self.honorarios: Dropdown = Dropdown(label='HONORÁRIOS', width=200, on_change=self.custom_hono)
+        self.administrador_contrato: TextField = TextField(label='ADMINISTRADOR', hint_text='Administrador do contrato', width=300)
+        self.checkbox_honorarios_iniciais: Checkbox = Checkbox(value=False, on_change=self.toggle_honorarios_iniciais)
+        self.honorarios_iniciais: TextField = TextField(label='Honorários iniciais', disabled=True)
+        self.honorarios: Dropdown = Dropdown(label='HONORÁRIOS', width=200, on_change=self.custom_hono, value=list(self.OPCOES_HONORARIOS.keys())[0])
         self.custom_honorarios: TextField = TextField(label='Descrição dos honorários', visible=False, width=630, multiline=True)
         for opcao in self.OPCOES_HONORARIOS.keys():
             self.honorarios.options.append(dropdown.Option(opcao))
         # END -- campos específicos para o Contrato de honorários --
         
-        self.context: Dict 
+        self.context: Dict = {}
         self.root =  Column([
 
                     Row([
@@ -68,9 +71,15 @@ class DocForm(UserControl):
                     ], wrap=True),
 
                     Row([self.finalidade], wrap=True),
+
+                    Row([self.checkbox_honorarios_iniciais, self.honorarios_iniciais]),
                     
                     Row([
-                        self.administrador_contrato, self.honorarios, self.custom_honorarios,
+                        self.administrador_contrato, self.honorarios, 
+                    ], wrap=True),
+
+                    Row([
+                        self.custom_honorarios,
                     ], wrap=True),
 
                     Row([
@@ -91,7 +100,12 @@ class DocForm(UserControl):
         # empty all fields with FOR
         for control in self.root.controls:
             for field in control.controls:
-                field.value = ''
+                try:
+                    # o if é para ignorar os checkboxes
+                    field.value = '' if isinstance(field.value, str) else None
+                except AttributeError:
+                    # como ElevatedButton não possui o campo value, ocorre erro ao tentar atribuir = '', o que basta ser ignorado neste caso
+                    pass
         
         self.update()
 
@@ -117,6 +131,8 @@ class DocForm(UserControl):
             'email': self.email.value,
             'finalidade': self.finalidade.value,
             'administrador_contrato': self.administrador_contrato.value,
+            'checkbox_honorarios_iniciais': self.checkbox_honorarios_iniciais.value,
+            'honorarios_iniciais': self.honorarios_iniciais.value,
             'honorarios': self.custom_honorarios.value or self.OPCOES_HONORARIOS[self.honorarios.value]
         }    
 
@@ -140,6 +156,12 @@ class DocForm(UserControl):
             self.custom_honorarios.visible = False
             self.custom_honorarios.value = None
         self.update()
+
+    def toggle_honorarios_iniciais(self, e):
+        self.honorarios_iniciais.disabled = not self.checkbox_honorarios_iniciais.value
+        self.context['honorarios_iniciais'] = self.checkbox_honorarios_iniciais.value
+        self.update() 
+
 
 
 def main(page: Page):
