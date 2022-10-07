@@ -1,6 +1,6 @@
 from typing import Dict
 import flet
-from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View
+from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors
 from docxtpl import DocxTemplate
 
 class ClienteForm(UserControl):
@@ -42,7 +42,10 @@ class ClienteForm(UserControl):
 
                     Row([self.finalidade], wrap=True),
 
-                    ElevatedButton('Gerar procuração', on_click=self.gerar_procuracao)
+                    Row([
+                        ElevatedButton('Limpar campos', on_click=self.limpar_campos, bgcolor=colors.RED_ACCENT_100, color='black'),
+                        ElevatedButton('Gerar procuração', on_click=self.gerar_procuracao),
+                    ])
                 ])
         
         return root
@@ -72,21 +75,39 @@ class ClienteForm(UserControl):
         primeiro_nome = self.nome_cliente.value.split(' ')[0]
         doc.save(f'Procuracao_{primeiro_nome}.docx')
 
+    def limpar_campos(self, e):
+        self.nome_cliente.value = ''
+        self.nacionalidade.value = ''
+        self.estado_civil.value = ''
+        self.profissao.value = ''
+        self.data_nascimento.value = ''
+        self.rg.value = ''
+        self.cpf.value = ''
+        self.logradouro.value = ''
+        self.numero.value = ''
+        self.bairro.value = ''
+        self.cidade.value = ''
+        self.uf.value = ''
+        self.cep.value = ''
+        self.email.value = ''
+        self.finalidade.value = ''
+        self.update()
 
 def main(page: Page):
     
 
     def route_change(route):
         page.views.clear()
+        page.theme_mode = 'dark'
         page.window_width = 700
         page.window_height = 550
         page.window_maximized = False
         page.views.append(
             
             View('/', [
-                AppBar(title=Text('Sistema gerador de documentos'), bgcolor='blue'),
+                AppBar(title=Text('Sistema gerador de documentos'), bgcolor=colors.BLUE_GREY_900),
                 ClienteForm()
-            ], horizontal_alignment='center', vertical_alignment='center'),
+            ]),
         )
 
         page.update()
