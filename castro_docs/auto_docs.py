@@ -43,7 +43,7 @@ class DocForm(UserControl):
         # START -- campos específicos para o Contrato de honorários --
         self.administrador_contrato: TextField = TextField(label='ADMINISTRADOR', hint_text='Nome do advogado administrador do contrato de honorários', width=300)
         self.honorarios: Dropdown = Dropdown(label='HONORÁRIOS', width=200, on_change=self.custom_hono)
-        self.custom_honorarios: TextField = TextField(label='Descrição dos honorários', visible=False)
+        self.custom_honorarios: TextField = TextField(label='Descrição dos honorários', visible=False, width=630, multiline=True)
         for opcao in self.OPCOES_HONORARIOS.keys():
             self.honorarios.options.append(dropdown.Option(opcao))
         # END -- campos específicos para o Contrato de honorários --
@@ -70,10 +70,8 @@ class DocForm(UserControl):
                     Row([self.finalidade], wrap=True),
                     
                     Row([
-                        self.administrador_contrato, self.honorarios,
+                        self.administrador_contrato, self.honorarios, self.custom_honorarios,
                     ], wrap=True),
-                    
-                    self.custom_honorarios,
 
                     Row([
                         ElevatedButton('Limpar campos', on_click=self.limpar_campos, bgcolor=colors.RED_ACCENT_100, color='black'),
@@ -150,8 +148,8 @@ def main(page: Page):
     def route_change(route):
         page.views.clear()
         page.theme_mode = 'dark'
-        page.window_width = 700
-        page.window_height = 550
+        page.window_width = 800
+        page.window_height = 650
         page.window_maximized = False
         page.views.append(
             
