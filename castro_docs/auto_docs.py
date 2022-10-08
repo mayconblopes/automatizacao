@@ -1,7 +1,9 @@
+from pickle import FALSE
 from typing import Dict
 import flet
-from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox, Card, Container, margin, AlertDialog
+from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox, Card, Container, margin, IconButton, icons, AlertDialog, TextButton, FilePicker, FilePickerResultEvent
 from docxtpl import DocxTemplate
+import webbrowser
 
 
 class DocForm(UserControl):
@@ -48,7 +50,8 @@ class DocForm(UserControl):
         # START -- campos específicos para o Contrato de honorários --
         self.administrador_contrato: TextField = TextField(label='ADMINISTRADOR', hint_text='Administrador do contrato', width=300)
         self.checkbox_honorarios_iniciais: Checkbox = Checkbox(value=False, on_change=self.toggle_honorarios_iniciais)
-        self.honorarios_iniciais: TextField = TextField(label='Honorários iniciais', disabled=True)
+        self.honorarios_iniciais: TextField = TextField(label='Honorários iniciais', disabled=True, width=580, 
+                                                        hint_text="Exemplo: R$ XXXX,XX na data da assinatura deste contrato")
         self.honorarios: Dropdown = Dropdown(
                                                 label='HONORÁRIOS',
                                                 width=200,
@@ -59,72 +62,81 @@ class DocForm(UserControl):
         for opcao in self.OPCOES_HONORARIOS.keys():
             self.honorarios.options.append(dropdown.Option(opcao))
         # END -- campos específicos para o Contrato de honorários --
-        
+
+        self.file_picker = FilePicker(on_result=self.configurar_diretorio)
+        self.folder_path = Text('', visible=False, size=10)
         self.context: Dict = {}
-        self.page.dialog = AlertDialog(title=Text("Hello, you!"), on_dismiss=lambda e: print("Dialog dismissed!"))
+
+        self.page.dialog = AlertDialog()
+        self.page.overlay.append(self.file_picker)
+
+        formulario = [
+                        Row([
+                            self.nome_cliente, self.nacionalidade, self.estado_civil, 
+                        ], wrap=True),
+
+                        Row([
+                            self.profissao, self.data_nascimento, self.rg, self.cpf,
+                        ], wrap=True),
+
+                        Row([
+                            self.logradouro, self.numero, self.bairro,
+                        ], wrap=True),
+
+                        Row([
+                            self.cidade, self.uf, self.cep, self.email,
+                        ], wrap=True),
+
+                        Row([self.finalidade], wrap=True),
+
+                        Row([self.checkbox_honorarios_iniciais, self.honorarios_iniciais]),
+                        
+                        Row([
+                            self.administrador_contrato, self.honorarios, 
+                        ], wrap=True),
+
+                        Row([
+                            self.custom_honorarios,
+                        ], wrap=True),
+                    ]
+
+        self.botoes = [
+                    ElevatedButton('Configurar diretório...', on_click=lambda _: self.file_picker.get_directory_path()),
+                    ElevatedButton('Nova Procuração', on_click=self.gerar_procuracao, disabled=True),
+                    ElevatedButton('Nova Dec Hipossuficiência', on_click=self.gerar_declaracao_hipossuficiencia, disabled=True),
+                    ElevatedButton('Novo Contrato de Honorários', on_click=self.gerar_contrato_honorarios, disabled=True),
+                    ElevatedButton('Limpar campos', on_click=self.limpar_campos,
+                                                    bgcolor=colors.RED_ACCENT_100, color='black'),
+                ]
 
         self.root = Row(
                         vertical_alignment='start', 
                         controls=[
+                            Column(formulario),
+                            
                             Column([
-
-                                Row([
-                                    self.nome_cliente, self.nacionalidade, self.estado_civil, 
-                                ], wrap=True),
-
-                                Row([
-                                    self.profissao, self.data_nascimento, self.rg, self.cpf,
-                                ], wrap=True),
-
-                                Row([
-                                    self.logradouro, self.numero, self.bairro,
-                                ], wrap=True),
-
-                                Row([
-                                    self.cidade, self.uf, self.cep, self.email,
-                                ], wrap=True),
-
-                                Row([self.finalidade], wrap=True),
-
-                                Row([self.checkbox_honorarios_iniciais, self.honorarios_iniciais]),
-                                
-                                Row([
-                                    self.administrador_contrato, self.honorarios, 
-                                ], wrap=True),
-
-                                Row([
-                                    self.custom_honorarios,
-                                ], wrap=True),
-                            ]),
-
-                            Card(
-                                content=Container(
-                                    Column([
-                                                ElevatedButton('Nova Procuração', on_click=self.gerar_procuracao),
-                                                ElevatedButton('Nova Dec Hipossuficiência', on_click=self.gerar_declaracao_hipossuficiencia),
-                                                ElevatedButton('Novo Contrato de Honorários', on_click=self.gerar_contrato_honorarios),
-                                                ElevatedButton('Limpar campos', on_click=self.limpar_campos,
-                                                                                bgcolor=colors.RED_ACCENT_100, color='black'),
-                                            ],
-                                            horizontal_alignment='center', spacing=30
+                                Card(
+                                    content=Container(
+                                        Column(self.botoes, horizontal_alignment='center', spacing=30),
+                                        padding=30,
+                                        bgcolor=colors.BLUE_GREY_900,
+                                        border_radius=10,
                                     ),
-                                    padding=30,
-                                    bgcolor=colors.BLUE_GREY_900,
-                                    border_radius=10,
+                                    margin = margin.only(left=50),
                                 ),
-                                margin = margin.only(left=50),
-                            ),
+                                self.folder_path,
+                            ], horizontal_alignment='center'),
                         ])
         
-        print(self.root.controls)
 
         # change text size of all TextFields to 11
-        for control in self.root.controls[0].controls:
+        for control in formulario:
             try:
                 for field in control.controls:
                     field.text_size = 11
             except AttributeError:
                 pass
+
         
         return self.root
     
@@ -172,8 +184,9 @@ class DocForm(UserControl):
 
         doc.render(self.context)
         primeiro_nome = self.nome_cliente.value.split(' ')[0]
-        doc.save(f'{tipo}_{primeiro_nome}.docx')
-        self.page.dialog.title = Text(f'Documento {tipo} gerado com sucesso')
+        save_folder = self.folder_path.value.split('\n')[1]
+        doc.save(f'{save_folder}/{tipo}_{primeiro_nome}.docx')
+        self.page.dialog.title = Text(f'Documento {tipo} gerado com sucesso!')
         self.page.dialog.open = True
         self.page.update()
     
@@ -197,23 +210,34 @@ class DocForm(UserControl):
     def toggle_honorarios_iniciais(self, e):
         self.honorarios_iniciais.disabled = not self.checkbox_honorarios_iniciais.value
         self.context['honorarios_iniciais'] = self.checkbox_honorarios_iniciais.value
-        self.update() 
+        self.update()
+    
+    def configurar_diretorio(self, e: FilePickerResultEvent):
+        self.folder_path.value = 'Salvando arquivos em \n' + e.path
+        self.folder_path.visible = True
+        
+        for botao in self.botoes:
+            botao.disabled = False
+        
+        self.update()
 
 
 def main(page: Page):
+    page.window_maximized = False
+    page.window_resizable = True
     page.theme_mode = 'dark'
     page.title = 'AutoDocs'
-    page.window_width = 1200
+    page.window_width = 1000
     page.window_height = 650
-    page.window_maximized = False
-    
+
     def route_change(route):
         page.views.clear()
         page.views.append(
             
             View('/', [
                 AppBar(title=Text('AutoDocs'), bgcolor=colors.BLUE_GREY_900),
-                DocForm(page)
+                DocForm(page),
+                Row([TextButton(text='Dev by mayconblopes', on_click=mayconblopes)])
             ], bgcolor='0xFF424242'),
         )
 
@@ -224,8 +248,12 @@ def main(page: Page):
         top_view = page.views[-1]
         page.go(top_view.route)
 
+    def mayconblopes(e):
+        webbrowser.open('https://github.com/mayconblopes')
+
     page.on_route_change = route_change
     page.on_view_pop = view_pop
+
     
     page.go(page.route)
     
