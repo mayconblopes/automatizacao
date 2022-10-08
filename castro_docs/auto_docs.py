@@ -26,6 +26,7 @@ class DocForm(UserControl):
             '10% ao final': '10% do aproveitamento econômico somente ao final do processo',
             'Outro': None,
         }
+        self.DEFAULT_HONORARIOS = list(self.OPCOES_HONORARIOS.keys())[0]
         # END - constantes
 
 
@@ -56,7 +57,7 @@ class DocForm(UserControl):
                                                 label='HONORÁRIOS',
                                                 width=200,
                                                 on_change=self.custom_hono,
-                                                value=list(self.OPCOES_HONORARIOS.keys())[0]
+                                                value=self.DEFAULT_HONORARIOS,
                                             )
         self.custom_honorarios: TextField = TextField(label='Descrição dos honorários', visible=False, width=630, multiline=True)
         for opcao in self.OPCOES_HONORARIOS.keys():
@@ -70,7 +71,7 @@ class DocForm(UserControl):
         self.page.dialog = AlertDialog()
         self.page.overlay.append(self.file_picker)
 
-        formulario = [
+        self.formulario = [
                         Row([
                             self.nome_cliente, self.nacionalidade, self.estado_civil, 
                         ], wrap=True),
@@ -112,7 +113,7 @@ class DocForm(UserControl):
         self.root = Row(
                         vertical_alignment='start', 
                         controls=[
-                            Column(formulario),
+                            Column(self.formulario),
                             
                             Column([
                                 Card(
@@ -130,7 +131,7 @@ class DocForm(UserControl):
         
 
         # change text size of all TextFields to 11
-        for control in formulario:
+        for control in self.formulario:
             try:
                 for field in control.controls:
                     field.text_size = 11
@@ -149,50 +150,70 @@ class DocForm(UserControl):
             for field in control.controls:
                 try:
                     # o if é para ignorar os checkboxes
-                    field.value = '' if isinstance(field.value, str) else None
+                    field.value = '' if isinstance(field, TextField) else None
                 except AttributeError:
                     # como ElevatedButton não possui o campo value, ocorre erro ao tentar atribuir = '', o que basta ser ignorado neste caso
                     pass
-        
+        self.honorarios.value = self.DEFAULT_HONORARIOS
         self.update()
 
     def gerar_doc(self, tipo, template):
-        # template is a string like 'templates/procuracao.docx'
-        doc = DocxTemplate(template)
 
-        self.context = { 
-            'nome_cliente': self.nome_cliente.value,
-            'nacionalidade': self.nacionalidade.value,
-            'estado_civil': self.estado_civil.value, 
-            'profissao': self.profissao.value, 
-            'data_nascimento': self.data_nascimento.value,
-            'rg': self.rg.value,
-            'cpf': self.cpf.value,
-            'logradouro': self.logradouro.value,
-            'numero': self.numero.value,
-            'bairro': self.bairro.value,
-            'cidade': self.cidade.value,
-            'uf': self.uf.value,
-            'cep': self.cep.value,
-            'email': self.email.value,
-            'finalidade': self.finalidade.value,
-            'administrador_contrato': self.administrador_contrato.value,
-            'checkbox_honorarios_iniciais': self.checkbox_honorarios_iniciais.value,
-            'honorarios_iniciais': self.honorarios_iniciais.value,
-            'honorarios': self.custom_honorarios.value or self.OPCOES_HONORARIOS[self.honorarios.value]
-        }    
+        # START -- validando campos vazios --
+        gerar = True
+        for control in self.formulario:
+            for field in control.controls:
+                if field.visible == False or field.disabled == True:
+                    continue
+                if field.value == '':
+                    gerar = False
+                    break
 
-        doc.render(self.context)
-        primeiro_nome = self.nome_cliente.value.split(' ')[0]
-        save_folder = self.folder_path.value.split('\n')[1]
-        doc.save(f'{save_folder}/{tipo}_{primeiro_nome}.docx')
-        self.page.dialog.title = Text(f'Documento {tipo} gerado com sucesso!')
+        if not gerar:
+            self.show_alert(Text('Preencha todos os campos antes', color=colors.AMBER_400))
+
+        # se não tem campo vazio no formulário, então continua com o algoritmo para gerar o arquivo
+        else:
+            # template is a string like 'templates/procuracao.docx'
+            doc = DocxTemplate(template)
+
+            self.context = { 
+                'nome_cliente': self.nome_cliente.value,
+                'nacionalidade': self.nacionalidade.value,
+                'estado_civil': self.estado_civil.value, 
+                'profissao': self.profissao.value, 
+                'data_nascimento': self.data_nascimento.value,
+                'rg': self.rg.value,
+                'cpf': self.cpf.value,
+                'logradouro': self.logradouro.value,
+                'numero': self.numero.value,
+                'bairro': self.bairro.value,
+                'cidade': self.cidade.value,
+                'uf': self.uf.value,
+                'cep': self.cep.value,
+                'email': self.email.value,
+                'finalidade': self.finalidade.value,
+                'administrador_contrato': self.administrador_contrato.value,
+                'checkbox_honorarios_iniciais': self.checkbox_honorarios_iniciais.value,
+                'honorarios_iniciais': self.honorarios_iniciais.value,
+                'honorarios': self.custom_honorarios.value or self.OPCOES_HONORARIOS[self.honorarios.value]
+            }    
+
+            doc.render(self.context)
+            primeiro_nome = self.nome_cliente.value.split(' ')[0]
+            save_folder = self.folder_path.value.split('\n')[1]
+            doc.save(f'{save_folder}/{tipo}_{primeiro_nome}.docx')
+            self.show_alert(Text(f'Documento {tipo} gerado com sucesso!'))
+    
+    def show_alert(self, message):
+        self.page.dialog.title = message
         self.page.dialog.open = True
+        self.page.dialog.bgcolor = 'pink'
         self.page.update()
     
     def gerar_procuracao(self, e):
         self.gerar_doc(tipo='Procuracao', template=self.TEMPLATE_PROCURACAO)
-    
+
     def gerar_declaracao_hipossuficiencia(self, e):
         self.gerar_doc(tipo='Declaracao de Hipossuficiencia', template=self.TEMPLATE_DECLARACAO_HIPOSSUFICIENCIA)
 
@@ -213,13 +234,20 @@ class DocForm(UserControl):
         self.update()
     
     def configurar_diretorio(self, e: FilePickerResultEvent):
-        self.folder_path.value = 'Salvando arquivos em \n' + e.path
-        self.folder_path.visible = True
-        
-        for botao in self.botoes:
-            botao.disabled = False
-        
+        try:
+            self.folder_path.value = 'Salvando arquivos em \n' + e.path
+            self.folder_path.visible = True
+            for botao in self.botoes:
+                botao.disabled = False
+
+        except TypeError:
+            if not self.folder_path.value:
+                self.show_alert(Text('Operação cancelada. Por favor, escolha um diretório válido.'))
+            else:
+                pass
         self.update()
+        
+        
 
 
 def main(page: Page):
