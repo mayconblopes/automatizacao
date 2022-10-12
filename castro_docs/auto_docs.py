@@ -5,6 +5,7 @@ from docxtpl import DocxTemplate
 import webbrowser
 import orm_sqlite, sqlite3
 from validate_docbr import CPF
+import datetime
 from time import sleep
 
 
@@ -61,13 +62,13 @@ class DocForm(UserControl):
         for estado_civil in OPCOES_ESTADO_CIVIL:
             self.estado_civil.options.append(dropdown.Option(estado_civil))
         self.profissao: TextField = TextField(label='PROFISSÃO', on_blur=self.hot_save, width=150)
-        self.data_nascimento: TextField = TextField(label='NASCIMENTO', on_blur=self.hot_save, width=150, hint_text='dd/mm/aaaa')
+        self.data_nascimento: TextField = TextField(label='NASCIMENTO', on_blur=self.data_nascimento_check, width=150, hint_text='dd/mm/aaaa')
         self.rg: TextField = TextField(label='RG', on_blur=self.hot_save, width=150)
         self.logradouro: TextField = TextField(label='LOGRADOURO', on_blur=self.hot_save, width=310)
         self.numero: TextField = TextField(label='Nº', on_blur=self.hot_save, width=100)
         self.bairro: TextField = TextField(label='BAIRRO', on_blur=self.hot_save, width=200)
         self.cidade: TextField = TextField(label='CIDADE', on_blur=self.hot_save, width=250)
-        self.uf: TextField = TextField(label='UF', on_blur=self.hot_save, width=100)
+        self.uf: TextField = TextField(label='UF', on_blur=self.uf_check, width=100)
         self.cep: TextField = TextField(label='CEP', on_blur=self.hot_save, width=100)
         self.email: TextField = TextField(label='E-MAIL', on_blur=self.hot_save, width=150)
         self.finalidade: TextField = TextField(label='FINALIDADE', width=630, multiline=True)
@@ -171,8 +172,44 @@ class DocForm(UserControl):
         
         return self.root
 
+    # def desabilita_campos_exceto(self, e, exceto):
+    #     """Desabilita todos os campos menos exceto"""
+    #     for control in self.qualificacao:
+    #         for field in control.controls:
+    #             field.disabled = True
+    #     exceto.disabled = False
+
     def hot_save(self, e):
         self.cpf_check(e, limpa_qualificacao=False)
+
+    def data_nascimento_check(self, e):
+        data_nascimento = self.data_nascimento.value
+        try:
+            datetime.datetime.strptime(data_nascimento, '%d/%m/%Y')
+            self.data_nascimento.error_text = None
+            self.update()
+            self.hot_save(e)
+        except ValueError:
+            self.data_nascimento.value = None
+            self.data_nascimento.error_text = 'DD/MM/AAAA'
+            self.data_nascimento.focus()
+            self.update()
+    
+    def uf_check(self, e):
+
+        uf_list = ['RO', 'AC', 'AM', 'RR', 'PA', 'AP', 'TO', 'MA', 'PI', 'CE', 'RN', 'PB', 'PE', 
+                   'AL', 'SE', 'BA', 'MG', 'ES', 'RJ', 'SP', 'PR', 'SC', 'RS', 'MS', 'MT', 'GO', 'DF'] 
+        
+        self.uf.value = str(self.uf.value).upper()
+        if self.uf.value not in uf_list:
+            self.uf.error_text = 'UF inválido'
+            self.uf.value = ''
+            self.uf.focus()
+            self.update()
+        else:
+            self.uf.error_text = None
+            self.hot_save(e)
+            self.update()
 
     def cpf_check(self, e, limpa_qualificacao=True):
         """
@@ -432,7 +469,7 @@ def main(page: Page):
     page.theme_mode = 'dark'
     page.title = 'AutoDocs'
     page.window_width = 1000
-    page.window_height = 700
+    page.window_height = 750
 
     def route_change(route):
         page.views.clear()
