@@ -94,11 +94,11 @@ class DocForm(UserControl):
         # campos específicos à qualifificacao do cliente
         self.qualificacao = [
                         Row([
-                            self.nome_cliente, self.nacionalidade, self.estado_civil, 
+                            self.cpf, self.nome_cliente, self.nacionalidade, 
                         ], wrap=True),
 
                         Row([
-                            self.profissao, self.data_nascimento, self.rg, self.cpf,
+                            self.estado_civil, self.profissao, self.data_nascimento, self.rg,
                         ], wrap=True),
 
                         Row([
