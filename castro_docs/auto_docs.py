@@ -400,7 +400,25 @@ class DocForm(UserControl):
 
 
 def main(page: Page):
-    database = orm_sqlite.Database('data/sqlite.db')
+    class Database(orm_sqlite.Database):
+        """
+        Custom Database, based on orm_sqlite.Database, that is used to override connect method so it's possible to set chack_same_thread=False
+        """
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+        
+        def connect(self):
+           """
+           Overrides connect method to set check_same_thread=False
+           """
+           super().connect() 
+           self._connection = sqlite3.connect(*self.args, **self.kwargs, check_same_thread=False)
+           self._connection.row_factory = sqlite3.Row
+           self._cursor = self._connection.cursor()
+           self._connected = True
+
+    # database = orm_sqlite.Database('data/sqlite.db')
+    database = Database('data/sqlite.db') # use my custom Database instead of orm_sqlite.Database
     page.window_maximized = False
     page.window_resizable = True
     page.theme_mode = 'dark'
