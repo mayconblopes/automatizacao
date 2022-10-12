@@ -1,16 +1,38 @@
-from pickle import FALSE
+from re import L
 from typing import Dict
+from unittest import skip
 import flet
 from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox, Card, Container, margin, IconButton, icons, AlertDialog, TextButton, FilePicker, FilePickerResultEvent
 from docxtpl import DocxTemplate
 import webbrowser
+import orm_sqlite, sqlite3
+from validate_docbr import CPF
+from time import sleep
 
+
+class ClienteModel (orm_sqlite.Model):
+    cpf = orm_sqlite.IntegerField(primary_key=True)
+    nome_cliente = orm_sqlite.StringField()
+    nacionalidade = orm_sqlite.StringField()
+    estado_civil = orm_sqlite.StringField()
+    profissao = orm_sqlite.StringField()
+    data_nascimento = orm_sqlite.StringField()
+    rg = orm_sqlite.StringField()
+    logradouro = orm_sqlite.StringField()
+    numero = orm_sqlite.StringField()
+    bairro = orm_sqlite.StringField()
+    cidade = orm_sqlite.StringField()
+    uf = orm_sqlite.StringField()
+    cep = orm_sqlite.StringField()
+    email = orm_sqlite.StringField()
+                                    
 
 class DocForm(UserControl):
 
-    def __init__(self, page):
+    def __init__(self, page: Page, database: orm_sqlite.Database):
         super().__init__()
         self.page = page
+        self.database = database
 
     def build(self):
 
@@ -31,20 +53,20 @@ class DocForm(UserControl):
 
 
         # START -- campos comuns à Procuracao, Declaracao de Hip. e Contrato de Honorários --
-        self.nome_cliente: TextField = TextField(label='NOME DO CLIENTE', width=300, autofocus=True)
-        self.nacionalidade: TextField = TextField(label='NACIONALIDADE', width=160)
-        self.estado_civil: TextField = TextField(label='ESTADO CIVIL', width=150)
-        self.profissao: TextField = TextField(label='PROFISSÃO', width=150)
-        self.data_nascimento: TextField = TextField(label='NASCIMENTO', width=150)
-        self.rg: TextField = TextField(label='RG', width=150)
-        self.cpf: TextField = TextField(label='CPF', width=150)
-        self.logradouro: TextField = TextField(label='LOGRADOURO', width=310)
-        self.numero: TextField = TextField(label='Nº', width=100)
-        self.bairro: TextField = TextField(label='BAIRRO', width=200)
-        self.cidade: TextField = TextField(label='CIDADE', width=250)
-        self.uf: TextField = TextField(label='UF', width=100)
-        self.cep: TextField = TextField(label='CEP', width=100)
-        self.email: TextField = TextField(label='E-MAIL', width=150)
+        self.cpf: TextField = TextField(label='CPF', width=150, on_blur=self.cpf_check, autofocus=True, helper_text='Informe o CPF')
+        self.nome_cliente: TextField = TextField(label='NOME DO CLIENTE', on_blur=self.hot_save, width=300)
+        self.nacionalidade: TextField = TextField(label='NACIONALIDADE', on_blur=self.hot_save, width=160)
+        self.estado_civil: TextField = TextField(label='ESTADO CIVIL', on_blur=self.hot_save, width=150)
+        self.profissao: TextField = TextField(label='PROFISSÃO', on_blur=self.hot_save, width=150)
+        self.data_nascimento: TextField = TextField(label='NASCIMENTO', on_blur=self.hot_save, width=150)
+        self.rg: TextField = TextField(label='RG', on_blur=self.hot_save, width=150)
+        self.logradouro: TextField = TextField(label='LOGRADOURO', on_blur=self.hot_save, width=310)
+        self.numero: TextField = TextField(label='Nº', on_blur=self.hot_save, width=100)
+        self.bairro: TextField = TextField(label='BAIRRO', on_blur=self.hot_save, width=200)
+        self.cidade: TextField = TextField(label='CIDADE', on_blur=self.hot_save, width=250)
+        self.uf: TextField = TextField(label='UF', on_blur=self.hot_save, width=100)
+        self.cep: TextField = TextField(label='CEP', on_blur=self.hot_save, width=100)
+        self.email: TextField = TextField(label='E-MAIL', on_blur=self.hot_save, width=150)
         self.finalidade: TextField = TextField(label='FINALIDADE', width=630, multiline=True)
         # END -- campos comuns à Procuracao, Declaracao de Hip. e Contrato de Honorários --
 
@@ -71,7 +93,8 @@ class DocForm(UserControl):
         self.page.dialog = AlertDialog()
         self.page.overlay.append(self.file_picker)
 
-        self.formulario = [
+        # campos específicos à qualifificacao do cliente
+        self.qualificacao = [
                         Row([
                             self.nome_cliente, self.nacionalidade, self.estado_civil, 
                         ], wrap=True),
@@ -87,7 +110,11 @@ class DocForm(UserControl):
                         Row([
                             self.cidade, self.uf, self.cep, self.email,
                         ], wrap=True),
+        ]
 
+        # campos que são específicos para os documentos a serem gerados
+        self.formulario_docs = [
+                        
                         Row([self.finalidade], wrap=True),
 
                         Row([self.checkbox_honorarios_iniciais, self.honorarios_iniciais]),
@@ -113,7 +140,7 @@ class DocForm(UserControl):
         self.root = Row(
                         vertical_alignment='start', 
                         controls=[
-                            Column(self.formulario),
+                            Column(self.qualificacao + self.formulario_docs),
                             
                             Column([
                                 Card(
@@ -131,7 +158,7 @@ class DocForm(UserControl):
         
 
         # change text size of all TextFields to 11
-        for control in self.formulario:
+        for control in self.qualificacao + self.formulario_docs:
             try:
                 for field in control.controls:
                     field.text_size = 11
@@ -140,20 +167,144 @@ class DocForm(UserControl):
 
         
         return self.root
+
+    def hot_save(self, e):
+        self.cpf_check(e, limpa_qualificacao=False)
+
+    def cpf_check(self, e, limpa_qualificacao=True):
+        """
+            Valida o CPF e salva no banco, mas apenas se todos os campos de qualificação do cliente estiverem preenchidos.
+            limpa_qualificacao = True significa que self.limpar_campos vai apagar todos os campos, incluindo os de qualificação.
+        """
+        cpf = CPF()
+
+        # se o CPF não for válido, apresenta mensagem de erro
+        if not cpf.validate(self.cpf.value):
+            cpf = self.cpf.value
+            self.limpar_campos(e, limpa_qualificao=limpa_qualificacao)
+            self.cpf.value = cpf
+            self.cpf.error_text = 'CPF inválido' if self.cpf.value else 'Digite um CPF válido'
+            self.cpf.focus()
+
+            self.update()
+        
+        # se o CPF for válido...
+        else:
+            self.cpf.error_text = None
+            cliente = self.recuperar_do_banco_pelo_cpf(e, self.cpf.value)
+            
+            # ... se o cliente não existe no banco, limpa todos os campos (exceto o CPF digitado), 
+            # apresenta mensagem indicando ser um novo cliente e aguarda todos os campos serem preenchidos para salvar no banco
+            if not cliente:
+                cpf = self.cpf.value
+                self.limpar_campos(e, limpa_qualificao=limpa_qualificacao)
+                self.cpf.value = cpf
+                self.cpf.helper_text = 'Novo cliente'
+                self.update()
+
+                # START -- validando campos vazios antes de salvar novo cliente no banco--
+                salvar = False
+                while not salvar:
+                    print('Aguardando todos os campos serem preenchidos para salvar no BD...')
+                    for control in self.qualificacao:
+                        for field in control.controls:
+
+                            # se o campo não estiver visível ou o campo estiver desabilitado...
+                            if field.visible == False or field.disabled == True:
+                                # ... ignora o campo que não está visível ou que está desabilitado
+                                continue
+
+                            # se algum campo possui valor vazio, salvar = False e interrompe o loop
+                            if field.value == '':
+                                salvar = False
+                                sleep(1)
+                                break
+
+                            # se nenhum campo está vazio, salvar = True
+                            else:
+                                salvar = True
+
+                # o código abaixo somente será executado se salvar = True, o que significa que todos os campos foram preenchidos
+                self.salvar_no_banco(e)
+            
+            # ... se o cliente já existe no banco de dados, limpa todos os campos (exceto CPF) e recupera suas informações do banco
+            else: 
+                cpf = self.cpf.value
+                self.limpar_campos(e, limpa_qualificao=limpa_qualificacao)
+                self.cpf.value = cpf
+
+                # recupera do BD se o campo for vazio, se não significa que o campo foi alterado pelo usuário, então mantém o campo como está
+                self.cpf.value = cliente['cpf'] if not self.cpf.value else self.cpf.value
+                self.nome_cliente.value = cliente['nome_cliente'] if not self.nome_cliente.value else self.nome_cliente.value
+                self.nacionalidade.value = cliente['nacionalidade'] if not self.nacionalidade.value else self.nacionalidade.value
+                self.estado_civil.value = cliente['estado_civil'] if not self.estado_civil.value else self.estado_civil.value
+                self.profissao.value = cliente['profissao'] if not self.profissao.value else self.profissao.value
+                self.data_nascimento.value = cliente['data_nascimento'] if not self.data_nascimento.value else self.data_nascimento.value
+                self.rg.value = cliente['rg'] if not self.rg.value else self.rg.value
+                self.logradouro.value = cliente['logradouro'] if not self.logradouro.value else self.logradouro.value
+                self.numero.value = cliente['numero'] if not self.numero.value else self.numero.value
+                self.bairro.value = cliente['bairro'] if not self.bairro.value else self.bairro.value
+                self.cidade.value = cliente['cidade'] if not self.cidade.value else self.cidade.value
+                self.uf.value = cliente['uf'] if not self.uf.value else self.uf.value
+                self.cep.value = cliente['cep'] if not self.cep.value else self.cep.value
+                self.email.value = cliente['email'] if not self.email.value else self.email.value
+                self.salvar_no_banco(e)
+                self.update()
+
+    def salvar_no_banco(self, e):
+        ClienteModel.objects.backend = self.database
+        self.CLIENTE_DB = ClienteModel({'cpf': self.cpf.value, 
+                                        'nome_cliente': self.nome_cliente.value,
+                                        'nacionalidade': self.nacionalidade.value,
+                                        'estado_civil': self.estado_civil.value,
+                                        'profissao': self.profissao.value,
+                                        'data_nascimento': self.data_nascimento.value,
+                                        'rg': self.rg.value,
+                                        'logradouro': self.logradouro.value,
+                                        'numero': self.numero.value,
+                                        'bairro': self.bairro.value,
+                                        'cidade': self.cidade.value,
+                                        'uf': self.uf.value,
+                                        'cep': self.cep.value,
+                                        'email': self.email.value,
+                                        })
+
+        self.CLIENTE_DB.save()
+        self.CLIENTE_DB.update()
+        print('BD atualizado')
     
-    def limpar_campos(self, e):
+    def recuperar_do_banco_pelo_cpf(self, e, cpf):
+        try:
+            ClienteModel.objects.backend = self.database
+            cliente = ClienteModel.objects.get(pk=cpf)
+        except sqlite3.OperationalError as err:
+            if 'no such table' in str(err):
+                print('Banco de dados ainda não foi criado... preencher todos os campos para que o banco seja criado pela primeira vez')
+                cliente = None
+            else:
+                print(err)
+
+        return cliente
+     
+    
+    def limpar_campos(self, e, limpa_qualificao=True):
         # self.nome_cliente.value = ''
         # self.nacionalidade.value = ''
         # (...)
         # empty all fields with FOR
         for control in self.root.controls[0].controls:
-            for field in control.controls:
-                try:
-                    # o if é para ignorar os checkboxes
-                    field.value = '' if isinstance(field, TextField) else None
-                except AttributeError:
-                    # como ElevatedButton não possui o campo value, ocorre erro ao tentar atribuir = '', o que basta ser ignorado neste caso
-                    pass
+            if not limpa_qualificao and control in self.qualificacao:
+                continue
+            else:
+                for field in control.controls:
+                    try:
+                        # o if é para ignorar os checkboxes
+                        field.value = '' if isinstance(field, TextField) else None
+                        field.error_text = None
+                        field.helper_text = None
+                    except AttributeError:
+                        # como ElevatedButton não possui o campo value, ocorre erro ao tentar atribuir = '', o que basta ser ignorado neste caso
+                        pass
         self.honorarios.value = self.DEFAULT_HONORARIOS
         self.update()
 
@@ -161,7 +312,7 @@ class DocForm(UserControl):
 
         # START -- validando campos vazios --
         gerar = True
-        for control in self.formulario:
+        for control in self.formulario_docs:
             for field in control.controls:
                 if field.visible == False or field.disabled == True:
                     continue
@@ -251,6 +402,7 @@ class DocForm(UserControl):
 
 
 def main(page: Page):
+    database = orm_sqlite.Database('data/sqlite.db')
     page.window_maximized = False
     page.window_resizable = True
     page.theme_mode = 'dark'
@@ -264,7 +416,7 @@ def main(page: Page):
             
             View('/', [
                 AppBar(title=Text('AutoDocs'), bgcolor=colors.BLUE_GREY_900),
-                DocForm(page),
+                DocForm(page=page, database=database),
                 Row([TextButton(text='Dev by mayconblopes', on_click=mayconblopes)])
             ], bgcolor='0xFF424242'),
         )
