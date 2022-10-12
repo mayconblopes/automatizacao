@@ -47,6 +47,9 @@ class DocForm(UserControl):
             'Outro': None,
         }
         self.DEFAULT_HONORARIOS = list(self.OPCOES_HONORARIOS.keys())[0]
+
+        OPCOES_ESTADO_CIVIL = ['solteiro(a)', 'casado(a)', 'separado(a)', 'divorciado(a)', 'viúvo(a)']
+
         # END - constantes
 
 
@@ -54,9 +57,11 @@ class DocForm(UserControl):
         self.cpf: TextField = TextField(label='CPF', width=150, on_blur=self.cpf_check, autofocus=True, helper_text='Informe o CPF')
         self.nome_cliente: TextField = TextField(label='NOME DO CLIENTE', on_blur=self.hot_save, width=300)
         self.nacionalidade: TextField = TextField(label='NACIONALIDADE', on_blur=self.hot_save, width=160)
-        self.estado_civil: TextField = TextField(label='ESTADO CIVIL', on_blur=self.hot_save, width=150)
+        self.estado_civil: Dropdown = Dropdown(label='ESTADO CIVIL', on_change=self.hot_save, width=150)
+        for estado_civil in OPCOES_ESTADO_CIVIL:
+            self.estado_civil.options.append(dropdown.Option(estado_civil))
         self.profissao: TextField = TextField(label='PROFISSÃO', on_blur=self.hot_save, width=150)
-        self.data_nascimento: TextField = TextField(label='NASCIMENTO', on_blur=self.hot_save, width=150)
+        self.data_nascimento: TextField = TextField(label='NASCIMENTO', on_blur=self.hot_save, width=150, hint_text='dd/mm/aaaa')
         self.rg: TextField = TextField(label='RG', on_blur=self.hot_save, width=150)
         self.logradouro: TextField = TextField(label='LOGRADOURO', on_blur=self.hot_save, width=310)
         self.numero: TextField = TextField(label='Nº', on_blur=self.hot_save, width=100)
@@ -143,12 +148,12 @@ class DocForm(UserControl):
                             Column([
                                 Card(
                                     content=Container(
-                                        Column(self.botoes, horizontal_alignment='center', spacing=30),
+                                        Column(self.botoes, horizontal_alignment='center', spacing=48),
                                         padding=30,
                                         bgcolor=colors.BLUE_GREY_900,
                                         border_radius=10,
                                     ),
-                                    margin = margin.only(left=50),
+                                    margin = margin.only(left=25, top=10),
                                 ),
                                 self.folder_path,
                             ], horizontal_alignment='center'),
@@ -156,12 +161,12 @@ class DocForm(UserControl):
         
 
         # change text size of all TextFields to 11
-        for control in self.qualificacao + self.formulario_docs:
-            try:
-                for field in control.controls:
-                    field.text_size = 11
-            except AttributeError:
-                pass
+        # for control in self.qualificacao + self.formulario_docs:
+        #     try:
+        #         for field in control.controls:
+        #             field.text_size = 11
+        #     except AttributeError:
+        #         pass
 
         
         return self.root
@@ -291,6 +296,7 @@ class DocForm(UserControl):
         # (...)
         # empty all fields with FOR
         for control in self.root.controls[0].controls:
+            # se limpa_qualificacao=False, entao ignora os campos de qualificacao
             if not limpa_qualificao and control in self.qualificacao:
                 continue
             else:
@@ -304,6 +310,8 @@ class DocForm(UserControl):
                         # como ElevatedButton não possui o campo value, ocorre erro ao tentar atribuir = '', o que basta ser ignorado neste caso
                         pass
         self.honorarios.value = self.DEFAULT_HONORARIOS
+        self.honorarios_iniciais.disabled = True
+        self.custom_honorarios.visible = False
         self.update()
 
     def gerar_doc(self, tipo, template):
@@ -424,7 +432,7 @@ def main(page: Page):
     page.theme_mode = 'dark'
     page.title = 'AutoDocs'
     page.window_width = 1000
-    page.window_height = 650
+    page.window_height = 700
 
     def route_change(route):
         page.views.clear()
