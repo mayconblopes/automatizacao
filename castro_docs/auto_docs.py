@@ -6,6 +6,7 @@ import webbrowser
 import orm_sqlite, sqlite3
 from validate_docbr import CPF
 import datetime
+import requests
 from time import sleep
 
 
@@ -67,10 +68,10 @@ class DocForm(UserControl):
         self.logradouro: TextField = TextField(label='LOGRADOURO', on_blur=self.hot_save, width=310)
         self.numero: TextField = TextField(label='Nº', on_blur=self.hot_save, width=100)
         self.bairro: TextField = TextField(label='BAIRRO', on_blur=self.hot_save, width=200)
-        self.cidade: TextField = TextField(label='CIDADE', on_blur=self.hot_save, width=250)
-        self.uf: TextField = TextField(label='UF', on_blur=self.uf_check, width=100)
-        self.cep: TextField = TextField(label='CEP', on_blur=self.hot_save, width=100)
-        self.email: TextField = TextField(label='E-MAIL', on_blur=self.hot_save, width=150)
+        self.cidade: TextField = TextField(label='CIDADE', on_blur=self.hot_save, width=220)
+        self.uf: TextField = TextField(label='UF', on_blur=self.uf_check, width=80)
+        self.cep: TextField = TextField(label='CEP', on_blur=self.cep_check, width=120)
+        self.email: TextField = TextField(label='E-MAIL', on_blur=self.hot_save, width=180, text_size=12)
         self.finalidade: TextField = TextField(label='FINALIDADE', width=630, multiline=True)
         # END -- campos comuns à Procuracao, Declaracao de Hip. e Contrato de Honorários --
 
@@ -108,11 +109,11 @@ class DocForm(UserControl):
                         ], wrap=True),
 
                         Row([
-                            self.logradouro, self.numero, self.bairro,
+                            self.email, self.cep, self.cidade, self.uf,
                         ], wrap=True),
 
                         Row([
-                            self.cidade, self.uf, self.cep, self.email,
+                            self.bairro, self.logradouro, self.numero,
                         ], wrap=True),
         ]
 
@@ -202,7 +203,7 @@ class DocForm(UserControl):
         
         self.uf.value = str(self.uf.value).upper()
         if self.uf.value not in uf_list:
-            self.uf.error_text = 'UF inválido'
+            self.uf.error_text = 'Inválido'
             self.uf.value = ''
             self.uf.focus()
             self.update()
@@ -210,6 +211,26 @@ class DocForm(UserControl):
             self.uf.error_text = None
             self.hot_save(e)
             self.update()
+    
+    def cep_check(self, e):
+        try:
+            request = requests.get(f'http://viacep.com.br/ws/{self.cep.value}/json')
+            address = request.json()
+            self.logradouro.value = address['logradouro'].title()
+            self.bairro.value = address['bairro'].title()
+            self.cidade.value = address['localidade'].title()
+            self.uf.value = address['uf'].upper()
+            self.cep.error_text = None
+            self.hot_save(e)
+            self.update()
+
+        except:
+            # self.cep.value = ''
+            self.cep.error_text = 'Não encontrado'
+            self.hot_save(e)
+            self.update()
+
+        self.update()
 
     def cpf_check(self, e, limpa_qualificacao=True):
         """
