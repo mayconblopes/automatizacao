@@ -1,5 +1,5 @@
 import flet
-from flet import Page, UserControl, TextField, Column, AppBar, Text, colors, IconButton, icons, Row, View, TextButton 
+from flet import Page, UserControl, TextField, Column, AppBar, Text, colors, IconButton, icons, Row, View, TextButton, WindowDragArea, Container
 import requests
 
 class FindsAddressByCEP(UserControl):
@@ -85,38 +85,46 @@ class FindsCEPByAddress(UserControl):
 
 def main(page: Page):
     page.title = 'Finds Address'
+    page.window_frameless = True
     page.theme_mode = 'dark'
-    page.window_height = 500
+    page.window_height = 600
     page.window_width = 379
     page.window_maximized = False
+    page.scroll = 'auto'
+    page.auto_scroll = True
     finds_address_by_cep = FindsAddressByCEP()
     finds_cep_by_address = FindsCEPByAddress()
 
     def route_change(route):
         page.views.clear()
+
+        appbar = AppBar(
+                        automatically_imply_leading=False,
+                        title=WindowDragArea(Container(Text('Finds Address'+' '*1000, size=16))),
+                        bgcolor=colors.SURFACE_VARIANT,
+                        actions=[
+                            TextButton(text='Buca avançada',  scale=.8, on_click=lambda _: page.go('/busca-cep-pelo-endereco')),
+                            IconButton(icons.CLOSE, on_click=lambda _: page.window_close())
+                            ]
+                        )
+        
         page.views.append(
             View(
                 route='/',
-                controls=[
-                    AppBar(title=Text('Busca ENDEREÇO pelo CEP', size=12), bgcolor=colors.SURFACE_VARIANT, actions=[
-                        TextButton(text='Bucar CEP pelo ENDEREÇO',  scale=.8, on_click=lambda _: page.go('/busca-cep-pelo-endereco'))
-                    ]),
-                    finds_address_by_cep,
-
-                ],
+                controls=[appbar, finds_address_by_cep],
             ),
         )
         if page.route == '/busca-cep-pelo-endereco':
+            appbar.actions = actions=[
+                                    TextButton(text='Bucar simples', scale=.8, on_click=lambda _: page.go('/')),
+                                    IconButton(icons.CLOSE, on_click=lambda _: page.window_close())
+                                ]
             page.views.append(
                 View(
                     route='/busca-cep-pelo-endereco',
-                    controls=[
-                        AppBar(title=Text('Busca CEP pelo ENDEREÇO', size=12), bgcolor=colors.SURFACE_VARIANT, actions=[
-                            TextButton(text='Bucar ENDEREÇO pelo CEP', scale=.8, on_click=lambda _: page.go('/'))
-                            ]),
-                        finds_cep_by_address,
-                    ],
+                    controls=[appbar, finds_cep_by_address],
                 ),
+                
             )
         page.update()
 
