@@ -85,7 +85,7 @@ class FindsCEPByAddress(UserControl):
 
 def main(page: Page):
     page.title = 'Finds Address'
-    # page.theme_mode = 'light'
+    page.theme_mode = 'dark'
     page.window_height = 500
     page.window_width = 379
     page.window_maximized = False
