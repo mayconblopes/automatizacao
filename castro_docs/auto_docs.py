@@ -2,7 +2,7 @@ from fileinput import filename
 from genericpath import isfile
 from typing import Dict
 import flet
-from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox, Card, Container, margin, IconButton, icons, AlertDialog, TextButton, FilePicker, FilePickerResultEvent
+from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox, Card, Container, margin, IconButton, icons, AlertDialog, TextButton, FilePicker, FilePickerResultEvent, WindowDragArea
 from docxtpl import DocxTemplate
 import webbrowser
 import orm_sqlite, sqlite3
@@ -526,8 +526,6 @@ class DocForm(UserControl):
         self.update()
         
         
-
-
 def main(page: Page):
     class Database(orm_sqlite.Database):
         """
@@ -549,18 +547,26 @@ def main(page: Page):
     # database = orm_sqlite.Database('data/sqlite.db')
     database = Database('data/sqlite.db') # use my custom Database instead of orm_sqlite.Database
     page.window_maximized = False
-    page.window_resizable = True
     page.theme_mode = 'dark'
     page.title = 'AutoDocs'
-    page.window_width = 1000
+    page.window_width = 900
     page.window_height = 750
+    page.window_frameless = True
 
     def route_change(route):
         page.views.clear()
         page.views.append(
             
             View('/', [
-                AppBar(title=Text('AutoDocs'), bgcolor=colors.BLUE_GREY_900),
+                AppBar(
+                    title=WindowDragArea(
+                        Text('AutoDocs'+' '*1000)
+                    ), 
+                    bgcolor=colors.BLUE_GREY_900,
+                    actions=[
+                        IconButton(icons.CLOSE, on_click=lambda _: page.window_close())
+                    ]
+                ),
                 DocForm(page=page, database=database),
                 Row([TextButton(text='Dev by mayconblopes', on_click=mayconblopes)])
             ], bgcolor='0xFF424242'),
@@ -576,9 +582,33 @@ def main(page: Page):
     def mayconblopes(e):
         webbrowser.open('https://github.com/mayconblopes')
 
+    def clean_tmp(e):
+        tmp_dir = tempfile.gettempdir()
+        
+        try:
+            os.remove(f'{tmp_dir}/proc.tmp')
+            print('Template da Procuração encontrado e removido da pasta de temporários')    
+        except FileNotFoundError:
+            print('Template da Procuração não encontrado na pasta de temporários')    
+
+        try:
+            os.remove(f'{tmp_dir}/dec.tmp')
+            print('Template da Declaração de Hipossuficiência encontrado e removido da pasta de temporários')    
+        except FileNotFoundError:
+            print('Template da Declaração de Hipossuficiência não encontrado na pasta de temporários')    
+        
+        try:    
+            os.remove(f'{tmp_dir}/contr.tmp')
+            print('Template do Contrato de Honorários encontrado e removido da pasta de temporários')    
+        except FileNotFoundError:
+            print('Template do Contrato de Honorários não encontrado na pasta de temporários')    
+        
+
+
+
     page.on_route_change = route_change
     page.on_view_pop = view_pop
-
+    page.on_disconnect = clean_tmp
     
     page.go(page.route)
     
