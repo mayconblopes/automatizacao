@@ -1,3 +1,5 @@
+from fileinput import filename
+from genericpath import isfile
 from typing import Dict
 import flet
 from flet import Page, ElevatedButton, TextField, Column, Row, UserControl, AppBar, Text, View, colors, Dropdown, dropdown, Checkbox, Card, Container, margin, IconButton, icons, AlertDialog, TextButton, FilePicker, FilePickerResultEvent
@@ -8,6 +10,10 @@ from validate_docbr import CPF
 import datetime
 import requests
 from time import sleep
+from decouple import config
+import pyrebase
+import tempfile
+import os
 
 
 class ClienteModel (orm_sqlite.Model):
@@ -33,13 +39,34 @@ class DocForm(UserControl):
         super().__init__()
         self.page = page
         self.database = database
+        self.firebase_config = {
+                    "apiKey": config('apiKey'),
+                    "authDomain": config('authDomain'),
+                    "projectId": config('projectId'),
+                    "storageBucket": config('storageBucket'),
+                    "messagingSenderId": config('messagingSenderId'),
+                    "appId": config('appId'),
+                    'databaseURL': '',
+                    }
+
+        self.firebase = pyrebase.initialize_app(self.firebase_config)
+        self.auth = self.firebase.auth()
+        self.storage = self.firebase.storage()
+
+        try:
+            user = self.auth.sign_in_with_email_and_password(config('email'), config('pwd'))
+            print('Templates carregados com sucesso.')
+            # self.show_alert(Text('Templates carregados com sucesso.'))
+        except:
+            print('Não foi possível carregar os templates. Verifique sua conexão com a internet.')
+            # self.show_alert(Text('Não foi possível carregar os templates. Verifique sua conexão com a internet.'))
 
     def build(self):
 
         # START - constantes
-        self.TEMPLATE_PROCURACAO: str = 'templates/procuracao.docx'
-        self.TEMPLATE_DECLARACAO_HIPOSSUFICIENCIA: str = 'templates/declaracao_hipossuficiencia.docx'
-        self.TEMPLATE_CONTRATO_HONORARIOS: str ='templates/contrato_honorarios.docx'
+        self.TEMPLATE_PROCURACAO = 'templates/procuracao.docx'
+        self.TEMPLATE_DECLARACAO_HIPOSSUFICIENCIA = 'templates/declaracao_hipossuficiencia.docx'
+        self.TEMPLATE_CONTRATO_HONORARIOS = 'templates/contrato_honorarios.docx'
         self.OPCOES_HONORARIOS = {
             '30% ao final': '30% do aproveitamento econômico somente ao final do processo',
             '25% ao final': '25% do aproveitamento econômico somente ao final do processo',
@@ -426,14 +453,50 @@ class DocForm(UserControl):
         self.page.dialog.bgcolor = 'pink'
         self.page.update()
     
+    def gerar_doc_pelo_template(self, template):
+        """template é um parametro para implementar um strategy"""
+
+        tmp_dir = tempfile.gettempdir()
+        tmp_proc_path = f'{tmp_dir}/proc.tmp'
+        tmp_dec_path = f'{tmp_dir}/dec.tmp'
+        tmp_contr_path = f'{tmp_dir}/contr.tmp'
+
+        if template == 'templates/procuracao.docx':
+            storage = self.storage.child(self.TEMPLATE_PROCURACAO)
+            if os.path.isfile(tmp_proc_path):
+                self.gerar_doc(tipo='Procuracao', template=tmp_proc_path)
+            else:
+                storage.download(path=f'', filename=tmp_proc_path)
+                self.gerar_doc(tipo='Procuracao', template=tmp_proc_path)
+
+        
+        elif template == 'templates/declaracao_hipossuficiencia.docx':
+            storage = self.storage.child(self.TEMPLATE_DECLARACAO_HIPOSSUFICIENCIA)
+            if os.path.isfile(tmp_dec_path):
+                self.gerar_doc(tipo='Declaracao de Hipossuficiencia', template=tmp_dec_path)
+            else:
+                storage.download(path='', filename=tmp_dec_path)
+                self.gerar_doc(tipo='Declaracao de Hipossuficiencia', template=tmp_dec_path)
+        
+        elif template == 'templates/contrato_honorarios.docx':
+            storage = self.storage.child(self.TEMPLATE_CONTRATO_HONORARIOS)
+            if os.path.isfile(tmp_contr_path):
+                self.gerar_doc(tipo='Contrato de Honorarios', template=tmp_contr_path)
+            else:    
+                storage.download(path='', filename=tmp_contr_path)
+                self.gerar_doc(tipo='Contrato de Honorarios', template=tmp_contr_path)
+        else:
+            raise AttributeError("Template não é válido")
+
+
     def gerar_procuracao(self, e):
-        self.gerar_doc(tipo='Procuracao', template=self.TEMPLATE_PROCURACAO)
+        self.gerar_doc_pelo_template(self.TEMPLATE_PROCURACAO)
 
     def gerar_declaracao_hipossuficiencia(self, e):
-        self.gerar_doc(tipo='Declaracao de Hipossuficiencia', template=self.TEMPLATE_DECLARACAO_HIPOSSUFICIENCIA)
+        self.gerar_doc_pelo_template(self.TEMPLATE_DECLARACAO_HIPOSSUFICIENCIA)
 
     def gerar_contrato_honorarios(self, e):
-        self.gerar_doc(tipo='Contrato de Honorarios', template=self.TEMPLATE_CONTRATO_HONORARIOS)
+        self.gerar_doc_pelo_template(self.TEMPLATE_CONTRATO_HONORARIOS)
 
     def custom_hono(self, e):
         if self.honorarios.value == 'Outro':
@@ -468,7 +531,7 @@ class DocForm(UserControl):
 def main(page: Page):
     class Database(orm_sqlite.Database):
         """
-        Custom Database, based on orm_sqlite.Database, that is used to override connect method so it's possible to set chack_same_thread=False
+        Custom Database, based on orm_sqlite.Database, that is used to override connect method so it's possible to set check_same_thread=False
         """
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
