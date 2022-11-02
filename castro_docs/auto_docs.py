@@ -457,9 +457,12 @@ class DocForm(UserControl):
         """template é um parametro para implementar um strategy"""
 
         tmp_dir = tempfile.gettempdir()
+        print(tmp_dir)
         tmp_proc_path = f'{tmp_dir}/proc.tmp'
         tmp_dec_path = f'{tmp_dir}/dec.tmp'
         tmp_contr_path = f'{tmp_dir}/contr.tmp'
+        
+       	user = self.auth.sign_in_with_email_and_password(config('email'), config('pwd'))
 
         if template == 'templates/procuracao.docx':
             storage = self.storage.child(self.TEMPLATE_PROCURACAO)
